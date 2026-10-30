@@ -65,7 +65,7 @@ for c in "${CANDIDATES[@]}"; do
 
         # Simpan juga ke Resources project agar self-contained untuk user baru
         if [ ! -d "$PROJECT_DIR/Resources/DisableTurboBoost.kext" ]; then
-            cp -R "$DEST_DIR/DisableTurboBoost.kext" "$PROJECT_DIR/Resources/DisableTurboBoost.kext"
+            cp -R "$DEST_DIR/DisableTurboBoost.kext" "$PROJECT_DIR/Resources/DisableTurboBoost.kext" 2>/dev/null || true
             echo "==> Kext di-bundle ke Resources/ project untuk distribusi user baru."
         fi
 
