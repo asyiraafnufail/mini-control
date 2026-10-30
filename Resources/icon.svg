@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#1f242e" />
+      <stop offset="100%" stop-color="#0f1217" />
+    </linearGradient>
+
+    <!-- Top Highlight -->
+    <radialGradient id="topHighlight" cx="50%" cy="15%" r="55%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.14" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Squircle Shadow -->
+    <filter id="squircleShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="20" stdDeviation="28" flood-color="#000000" flood-opacity="0.55" />
+    </filter>
+
+    <!-- Waveform Glow -->
+    <filter id="ecgGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="18" result="blur1" />
+      <feGaussianBlur stdDeviation="8" result="blur2" />
+      <feMerge>
+        <feMergeNode in="blur1" />
+        <feMergeNode in="blur2" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Turbo Spark Glow -->
+    <filter id="sparkGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Clip Path for Squircle -->
+    <clipPath id="squircleClip">
+      <rect x="100" y="100" width="824" height="824" rx="185" ry="185" />
+    </clipPath>
+  </defs>
+
+  <!-- Drop Shadow Base -->
+  <rect x="100" y="100" width="824" height="824" rx="185" ry="185" fill="#000000" filter="url(#squircleShadow)" />
+
+  <!-- Main Squircle Contents -->
+  <g clip-path="url(#squircleClip)">
+    <!-- Base Gradient -->
+    <rect x="100" y="100" width="824" height="824" fill="url(#bgGrad)" />
+
+    <!-- Subtle Radial Top Lighting -->
+    <rect x="100" y="100" width="824" height="824" fill="url(#topHighlight)" />
+
+    <!-- Grid Lines (ECG monitor texture) -->
+    <g stroke="#ffffff" stroke-opacity="0.04" stroke-width="1.2">
+      <line x1="148" y1="100" x2="148" y2="924" />
+      <line x1="196" y1="100" x2="196" y2="924" />
+      <line x1="244" y1="100" x2="244" y2="924" />
+      <line x1="292" y1="100" x2="292" y2="924" />
+      <line x1="340" y1="100" x2="340" y2="924" />
+      <line x1="388" y1="100" x2="388" y2="924" />
+      <line x1="436" y1="100" x2="436" y2="924" />
+      <line x1="484" y1="100" x2="484" y2="924" />
+      <line x1="532" y1="100" x2="532" y2="924" />
+      <line x1="580" y1="100" x2="580" y2="924" />
+      <line x1="628" y1="100" x2="628" y2="924" />
+      <line x1="676" y1="100" x2="676" y2="924" />
+      <line x1="724" y1="100" x2="724" y2="924" />
+      <line x1="772" y1="100" x2="772" y2="924" />
+      <line x1="820" y1="100" x2="820" y2="924" />
+      <line x1="868" y1="100" x2="868" y2="924" />
+
+      <line x1="100" y1="148" x2="924" y2="148" />
+      <line x1="100" y1="196" x2="924" y2="196" />
+      <line x1="100" y1="244" x2="924" y2="244" />
+      <line x1="100" y1="292" x2="924" y2="292" />
+      <line x1="100" y1="340" x2="924" y2="340" />
+      <line x1="100" y1="388" x2="924" y2="388" />
+      <line x1="100" y1="436" x2="924" y2="436" />
+      <line x1="100" y1="484" x2="924" y2="484" />
+      <line x1="100" y1="532" x2="924" y2="532" />
+      <line x1="100" y1="580" x2="924" y2="580" />
+      <line x1="100" y1="628" x2="924" y2="628" />
+      <line x1="100" y1="676" x2="924" y2="676" />
+      <line x1="100" y1="724" x2="924" y2="724" />
+      <line x1="100" y1="772" x2="924" y2="772" />
+      <line x1="100" y1="820" x2="924" y2="820" />
+      <line x1="100" y1="868" x2="924" y2="868" />
+    </g>
+
+    <!-- ECG Waveform Glow Layer -->
+    <path d="M 244.8 512.0 L 341.4 512.0 L 381.6 473.4 L 421.9 512.0 L 454.1 634.3 L 512.0 336.6 L 566.7 610.2 L 598.9 512.0 L 639.1 489.5 L 679.4 512.0 L 775.9 512.0"
+          fill="none"
+          stroke="#00f2bf"
+          stroke-width="20"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          filter="url(#ecgGlow)"
+          opacity="0.85" />
+
+    <!-- ECG Waveform Core Layer -->
+    <path d="M 244.8 512.0 L 341.4 512.0 L 381.6 473.4 L 421.9 512.0 L 454.1 634.3 L 512.0 336.6 L 566.7 610.2 L 598.9 512.0 L 639.1 489.5 L 679.4 512.0 L 775.9 512.0"
+          fill="none"
+          stroke="#e8fff7"
+          stroke-width="10"
+          stroke-linecap="round"
+          stroke-linejoin="round" />
+
+    <!-- Turbo Boost Status Spark / Indicator (Top-Right) -->
+    <!-- Glow -->
+    <circle cx="742.7" cy="281.3" r="32" fill="#00d4ff" filter="url(#sparkGlow)" opacity="0.9" />
+    <!-- Outer Cyan Ring -->
+    <circle cx="742.7" cy="281.3" r="28" fill="#33d9ff" />
+    <!-- Bright White Core -->
+    <circle cx="742.7" cy="281.3" r="16" fill="#ffffff" />
+  </g>
+
+  <!-- Apple Glass Border -->
+  <rect x="100" y="100" width="824" height="824" rx="185" ry="185" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-opacity="0.18" />
+</svg>
