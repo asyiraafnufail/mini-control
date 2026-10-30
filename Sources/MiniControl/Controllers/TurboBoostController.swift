@@ -85,9 +85,16 @@ final class TurboBoostController {
                     installScriptPath = candidate
                 }
             } else {
-                let devPath = "/Applications/MiniControl.app/Contents/Resources/install_helper.sh"
-                if FileManager.default.fileExists(atPath: devPath) {
-                    installScriptPath = devPath
+                let candidates = [
+                    "/Applications/MiniControl.app/Contents/Resources/install_helper.sh",
+                    "./MiniControl.app/Contents/Resources/install_helper.sh",
+                    "./scripts/install_helper.sh"
+                ]
+                for c in candidates {
+                    if FileManager.default.fileExists(atPath: c) {
+                        installScriptPath = c
+                        break
+                    }
                 }
             }
 
@@ -96,7 +103,8 @@ final class TurboBoostController {
                 return
             }
 
-            let appleScriptSource = "do shell script \"'\(scriptPath)'\" with administrator privileges"
+            let absPath = URL(fileURLWithPath: scriptPath).standardized.path
+            let appleScriptSource = "do shell script \"'\(absPath)'\" with administrator privileges"
             var error: NSDictionary?
             if let script = NSAppleScript(source: appleScriptSource) {
                 script.executeAndReturnError(&error)
@@ -224,7 +232,23 @@ final class TurboBoostController {
                 if !enabled {
                     DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 1.0) { [weak self] in
                         guard let self = self else { return }
-                        if self.currentState != .disabled {
+
+                        let pipe = Pipe()
+                        let proc = Process()
+                        proc.executableURL = URL(fileURLWithPath: "/usr/sbin/kextstat")
+                        proc.arguments = ["-b", "com.rugarciap.DisableTurboBoost"]
+                        proc.standardOutput = pipe
+                        proc.standardError = Pipe()
+                        var isKextLoaded = false
+                        if (try? proc.run()) != nil {
+                            proc.waitUntilExit()
+                            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                            if let output = String(data: data, encoding: .utf8) {
+                                isKextLoaded = output.contains("com.rugarciap.DisableTurboBoost")
+                            }
+                        }
+
+                        if !isKextLoaded {
                             self.helperQueue.async {
                                 let retryProc = Process()
                                 retryProc.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
@@ -243,9 +267,12 @@ final class TurboBoostController {
                 }
             }
         } else {
-            // Toggled in user mode
-            onStateChange?(currentState)
-            completion(.success(enabled))
+            let error = NSError(
+                domain: "MiniControl",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Helper tool belum terpasang."]
+            )
+            completion(.failure(error))
         }
     }
 }

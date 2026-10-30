@@ -10,6 +10,7 @@ KEXT_BUNDLE_ID="com.rugarciap.DisableTurboBoost"
 find_kext() {
     local candidate_paths=(
         "/Library/Application Support/MiniControl/DisableTurboBoost.kext"
+        "/Applications/MiniControl.app/Contents/Resources/DisableTurboBoost.kext"
         "/Applications/tbswitcher_resources/DisableTurboBoost.64bits.kext"
         "/Applications/tbswitcher_resources/DisableTurboBoost.kext"
         "/Library/Application Support/TurboBoostSwitcher/DisableTurboBoost.kext"
@@ -43,6 +44,16 @@ check_status() {
 set_turbo() {
     local state="$1"
 
+    # Self-heal kext permissions/location if needed
+    local standard_kext="/Library/Application Support/MiniControl/DisableTurboBoost.kext"
+    if [ "$(id -u)" -eq 0 ] && [ ! -d "$standard_kext" ] && [ -n "$FOUND_KEXT" ] && [ "$FOUND_KEXT" != "$standard_kext" ]; then
+        mkdir -p "/Library/Application Support/MiniControl"
+        cp -R "$FOUND_KEXT" "$standard_kext" 2>/dev/null || true
+        chown -R root:wheel "$standard_kext" 2>/dev/null || true
+        chmod -R 755 "$standard_kext" 2>/dev/null || true
+        FOUND_KEXT="$standard_kext"
+    fi
+
     if [ "$state" = "off" ] || [ "$state" = "disable" ]; then
         # Turbo Boost OFF = Load DisableTurboBoost.kext
         if [ "$(id -u)" -eq 0 ]; then
@@ -61,12 +72,15 @@ set_turbo() {
         fi
         if kextstat 2>/dev/null | grep -q "$KEXT_BUNDLE_ID"; then
             echo "disabled" > "$STATE_FILE"
+            chmod 666 "$STATE_FILE" 2>/dev/null || true
             echo "disabled"
+            exit 0
         else
             echo "enabled" > "$STATE_FILE"
+            chmod 666 "$STATE_FILE" 2>/dev/null || true
             echo "enabled"
+            exit 1
         fi
-        chmod 666 "$STATE_FILE" 2>/dev/null || true
     else
         # Turbo Boost ON = Unload DisableTurboBoost.kext
         if [ "$(id -u)" -eq 0 ]; then
@@ -77,9 +91,17 @@ set_turbo() {
                 voltageshift turbo 1 >/dev/null 2>&1 || true
             fi
         fi
-        echo "enabled" > "$STATE_FILE"
-        chmod 666 "$STATE_FILE" 2>/dev/null || true
-        echo "enabled"
+        if kextstat 2>/dev/null | grep -q "$KEXT_BUNDLE_ID"; then
+            echo "disabled" > "$STATE_FILE"
+            chmod 666 "$STATE_FILE" 2>/dev/null || true
+            echo "disabled"
+            exit 1
+        else
+            echo "enabled" > "$STATE_FILE"
+            chmod 666 "$STATE_FILE" 2>/dev/null || true
+            echo "enabled"
+            exit 0
+        fi
     fi
 }
 

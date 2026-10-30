@@ -77,7 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if TurboBoostController.shared.isHelperInstalled {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
-            process.arguments = ["/usr/local/bin/minicontrol-tb", "on"]
+            process.arguments = ["-n", "/usr/local/bin/minicontrol-tb", "on"]
             try? process.run()
             process.waitUntilExit()
         }
