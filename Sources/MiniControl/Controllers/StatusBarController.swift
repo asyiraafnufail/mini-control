@@ -276,10 +276,18 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         alert.messageText = "Turbo Boost Helper Setup"
         if turboController.isHelperInstalled {
             alert.informativeText = "Helper tool is installed at /usr/local/bin/minicontrol-tb.\nHardware MSR toggling is fully enabled."
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
         } else {
-            alert.informativeText = "To allow hardware MSR clock control without password prompts, run in Terminal:\n\nsudo make install-helper"
+            let cmd = "sudo \"/Applications/MiniControl.app/Contents/Resources/install_helper.sh\""
+            alert.informativeText = "To allow hardware MSR clock control without password prompts, run this command in Terminal:\n\n\(cmd)"
+            alert.addButton(withTitle: "Copy Command")
+            alert.addButton(withTitle: "Cancel")
+            let resp = alert.runModal()
+            if resp == .alertFirstButtonReturn {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(cmd, forType: .string)
+            }
         }
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
     }
 }

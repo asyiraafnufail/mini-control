@@ -24,6 +24,7 @@ chmod +x "$HELPER_BIN"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 CANDIDATES=(
+    "$SCRIPT_DIR/DisableTurboBoost.kext"
     "$PROJECT_DIR/Resources/DisableTurboBoost.kext"
     "/Applications/tbswitcher_resources/DisableTurboBoost.64bits.kext"
     "/Applications/tbswitcher_resources/DisableTurboBoost.kext"

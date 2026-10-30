@@ -93,13 +93,14 @@
 3. Launch MiniControl from `/Applications` or Spotlight.
 
 ### Enable Turbo Boost Hardware Control (One-Time Setup)
-macOS restricts direct writes to CPU Model Specific Registers (MSR) for security. To grant MiniControl permission to toggle Turbo Boost without prompting for root passwords on every click:
+macOS restricts direct writes to CPU Model Specific Registers (MSR) for security. To grant MiniControl permission to toggle Turbo Boost without prompting for root passwords on every click, run:
 
 ```bash
-sudo make install-helper
+sudo "/Applications/MiniControl.app/Contents/Resources/install_helper.sh"
 ```
+*(Or `sudo make install-helper` if building from source)*.
 
-This installs `/usr/local/bin/minicontrol-tb` and configures necessary root execution policies via `sudoers.d/minicontrol-tb`.
+This installs `/usr/local/bin/minicontrol-tb` and configures necessary root execution policies via `sudoers.d/minicontrol`.
 
 ---
 

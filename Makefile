@@ -42,6 +42,9 @@ app: build
 	@if [ -f "Resources/AppIcon.icns" ]; then \
 		cp Resources/AppIcon.icns $(RESOURCES_DIR)/; \
 	fi
+	@cp scripts/install_helper.sh $(RESOURCES_DIR)/
+	@cp scripts/tb_toggle.sh $(RESOURCES_DIR)/
+	@chmod +x $(RESOURCES_DIR)/*.sh
 	@echo "Signing $(APP_BUNDLE) with ad-hoc signature..."
 	@codesign --force --deep --sign - $(APP_BUNDLE) 2>/dev/null || true
 	@echo "Build successful: $(APP_BUNDLE)"
