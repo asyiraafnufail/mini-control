@@ -69,5 +69,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let interval = UserDefaults.standard.double(forKey: "refreshInterval")
         cpuMonitor.start(interval: interval > 0 ? interval : 2.0)
         powerMonitor.refresh()
+        TurboBoostController.shared.reapplyStateOnWake()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Safety: Restore Turbo Boost to enabled when app quits
+        if TurboBoostController.shared.isHelperInstalled {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+            process.arguments = ["/usr/local/bin/minicontrol-tb", "on"]
+            try? process.run()
+            process.waitUntilExit()
+        }
     }
 }

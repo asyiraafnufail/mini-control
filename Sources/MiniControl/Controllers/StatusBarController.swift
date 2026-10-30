@@ -1,4 +1,5 @@
 import AppKit
+import ServiceManagement
 
 final class StatusBarController: NSObject, NSMenuDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -9,10 +10,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let turboController = TurboBoostController.shared
 
     // Menu items
-    private let cpuMenuItem = NSMenuItem(title: "CPU: Calculating...", action: nil, keyEquivalent: "")
+    private let cpuMenuItem = NSMenuItem(title: "CPU Load: Calculating...", action: nil, keyEquivalent: "")
+    private let clockMenuItem = NSMenuItem(title: "Max Clock: Calculating...", action: nil, keyEquivalent: "")
     private let powerMenuItem = NSMenuItem(title: "Power: Reading...", action: nil, keyEquivalent: "")
     private let turboMenuItem = NSMenuItem(title: "Turbo Boost", action: #selector(toggleTurboBoost), keyEquivalent: "t")
     private let showWattMenuItem = NSMenuItem(title: "Show Watt in Menu Bar", action: #selector(toggleShowWatt), keyEquivalent: "")
+    private let launchAtLoginMenuItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
 
     // User preferences
     private var showWattInMenuBar: Bool {
@@ -36,15 +39,21 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         setupMenu()
         setupBindings()
         updateStatusItemAppearance()
+        updateClockMenuItem()
     }
 
     private func setupMenu() {
         menu.delegate = self
         menu.autoenablesItems = false
 
-        // 1. CPU Item
+        // 1. CPU Load Item
         cpuMenuItem.isEnabled = false
         menu.addItem(cpuMenuItem)
+
+        // 1b. Real Max Clock Speed Item
+        clockMenuItem.isEnabled = false
+        updateClockMenuItem()
+        menu.addItem(clockMenuItem)
 
         // 2. Power Item
         powerMenuItem.isEnabled = false
@@ -66,6 +75,13 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         showWattMenuItem.state = showWattInMenuBar ? .on : .off
         prefsMenu.addItem(showWattMenuItem)
 
+        launchAtLoginMenuItem.target = self
+        launchAtLoginMenuItem.state = (SMAppService.mainApp.status == .enabled) ? .on : .off
+        prefsMenu.addItem(launchAtLoginMenuItem)
+
+        prefsMenu.addItem(NSMenuItem.separator())
+
+        // Polling rate submenu
         let intervalMenu = NSMenu(title: "Polling Rate")
         for sec in [1.0, 2.0, 5.0] {
             let item = NSMenuItem(
@@ -82,6 +98,17 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         let intervalMenuItem = NSMenuItem(title: "Polling Rate", action: nil, keyEquivalent: "")
         intervalMenuItem.submenu = intervalMenu
         prefsMenu.addItem(intervalMenuItem)
+
+        prefsMenu.addItem(NSMenuItem.separator())
+
+        // Install Helper tool option
+        let helperItem = NSMenuItem(
+            title: "Helper Tool Setup...",
+            action: #selector(showHelperInstallAlert),
+            keyEquivalent: ""
+        )
+        helperItem.target = self
+        prefsMenu.addItem(helperItem)
 
         let prefsMenuItem = NSMenuItem(title: "Preferences", action: nil, keyEquivalent: "")
         prefsMenuItem.submenu = prefsMenu
@@ -109,6 +136,19 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         powerMonitor.onUpdate = { [weak self] status in
             self?.handlePowerUpdate(status: status)
         }
+
+        turboController.onStateChange = { [weak self] _ in
+            self?.updateTurboMenuItem()
+            self?.updateClockMenuItem()
+            self?.updateStatusItemAppearance()
+        }
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        turboController.refreshRealStatus()
+        powerMonitor.refresh()
+        updateClockMenuItem()
+        launchAtLoginMenuItem.state = (SMAppService.mainApp.status == .enabled) ? .on : .off
     }
 
     private func handleCPUUpdate(usage: Double, level: CPUStressLevel) {
@@ -121,19 +161,31 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         updateStatusItemAppearance()
     }
 
+    private func updateClockMenuItem() {
+        let isEnabled = (turboController.currentState == .enabled)
+        clockMenuItem.title = cpuMonitor.maxClockSummary(turboEnabled: isEnabled)
+    }
+
     private func updateStatusItemAppearance() {
         guard let button = statusItem.button else { return }
 
-        button.image = HeartbeatIcon.icon(for: cpuMonitor.currentLevel)
+        let isTBEnabled = (turboController.currentState == .enabled)
+
+        // Single combined icon: Heartbeat waveform + real-time Turbo Boost dot
+        button.image = HeartbeatIcon.icon(
+            for: cpuMonitor.currentLevel,
+            turboBoostEnabled: isTBEnabled
+        )
         button.imagePosition = .imageLeading
 
         if showWattInMenuBar, let power = powerMonitor.currentStatus {
-            let wattText = power.isCharging ? String(format: " +%.0fW", power.instantaneousWatts) :
-                           power.isACConnected ? " AC" :
-                           String(format: " %.0fW", abs(power.instantaneousWatts))
+            let wattText = power.isCharging ? String(format: "+%.0fW", power.instantaneousWatts) :
+                           power.isACConnected ? "AC" :
+                           String(format: "%.0fW", abs(power.instantaneousWatts))
 
             let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium),
+                .foregroundColor: NSColor.labelColor
             ]
             button.attributedTitle = NSAttributedString(string: wattText, attributes: attributes)
         } else {
@@ -148,10 +200,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             turboMenuItem.title = "Turbo Boost: Not Supported"
             turboMenuItem.state = .off
             turboMenuItem.isEnabled = false
-        case .helperRequired:
-            turboMenuItem.title = "Turbo Boost: Install Helper..."
-            turboMenuItem.state = .off
-            turboMenuItem.isEnabled = true
         case .enabled:
             turboMenuItem.title = "Turbo Boost: Enabled"
             turboMenuItem.state = .on
@@ -164,17 +212,14 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     @objc private func toggleTurboBoost() {
-        if turboController.currentState == .helperRequired {
-            showHelperInstallAlert()
-            return
-        }
-
         let willEnable = (turboController.currentState != .enabled)
         turboController.toggle(enabled: willEnable) { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
                 case .success:
                     self?.updateTurboMenuItem()
+                    self?.updateClockMenuItem()
+                    self?.updateStatusItemAppearance()
                 case .failure(let error):
                     let alert = NSAlert()
                     alert.messageText = "Turbo Boost Error"
@@ -197,7 +242,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         currentInterval = sec
         cpuMonitor.updateInterval(sec)
 
-        // Update submenu checkmarks
         if let parent = sender.parent {
             for item in parent.submenu?.items ?? [] {
                 item.state = (item == sender) ? .on : .off
@@ -209,10 +253,32 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         NSApplication.shared.terminate(nil)
     }
 
-    private func showHelperInstallAlert() {
+    @objc private func toggleLaunchAtLogin() {
+        do {
+            if SMAppService.mainApp.status == .enabled {
+                try SMAppService.mainApp.unregister()
+                launchAtLoginMenuItem.state = .off
+            } else {
+                try SMAppService.mainApp.register()
+                launchAtLoginMenuItem.state = .on
+            }
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Launch at Login"
+            alert.informativeText = "Untuk mengaktifkan Launch at Login, pastikan MiniControl.app berada di dalam folder /Applications."
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
+    }
+
+    @objc private func showHelperInstallAlert() {
         let alert = NSAlert()
-        alert.messageText = "Privileged Helper Required"
-        alert.informativeText = "Writing to Intel MSR registers to toggle Turbo Boost requires a root helper daemon.\n\nRun MiniControl setup script with administrator rights to configure."
+        alert.messageText = "Turbo Boost Helper Setup"
+        if turboController.isHelperInstalled {
+            alert.informativeText = "Helper tool is installed at /usr/local/bin/minicontrol-tb.\nHardware MSR toggling is fully enabled."
+        } else {
+            alert.informativeText = "To allow hardware MSR clock control without password prompts, run in Terminal:\n\nsudo make install-helper"
+        }
         alert.addButton(withTitle: "OK")
         alert.runModal()
     }

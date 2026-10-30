@@ -1,56 +1,81 @@
 import AppKit
 
 final class HeartbeatIcon {
-    private static let size = NSSize(width: 22, height: 18)
-    private static var cachedIcons: [CPUStressLevel: NSImage] = [:]
+    // Total size with harmonic 5pt rhythmic spacing:
+    // [1.5 .. 18.0 (Waveform)] -- 4.5pt gap -- [24.5 (Dot r=2.2)] -- 5.3pt margin
+    private static let size = NSSize(width: 32, height: 18)
+    private static var cache: [String: NSImage] = [:]
 
-    static func icon(for level: CPUStressLevel) -> NSImage {
-        if let cached = cachedIcons[level] {
+    static func icon(for level: CPUStressLevel, turboBoostEnabled: Bool) -> NSImage {
+        let key = "\(level)-\(turboBoostEnabled)"
+        if let cached = cache[key] {
             return cached
         }
 
-        let image = renderIcon(level: level)
-        cachedIcons[level] = image
+        let image = renderIcon(level: level, turboBoostEnabled: turboBoostEnabled)
+        cache[key] = image
         return image
     }
 
-    private static func renderIcon(level: CPUStressLevel) -> NSImage {
+    private static func renderIcon(level: CPUStressLevel, turboBoostEnabled: Bool) -> NSImage {
         let image = NSImage(size: size)
         image.lockFocus()
 
-        let color: NSColor
+        // 1. Color for heartbeat
+        let strokeColor: NSColor
         switch level {
         case .normal:
-            color = NSColor.systemGreen
+            strokeColor = NSColor.systemGreen
         case .medium:
-            color = NSColor.systemYellow
+            strokeColor = NSColor.systemYellow
         case .high:
-            color = NSColor.systemRed
+            strokeColor = NSColor.systemRed
         }
 
-        // Draw ECG / Heartbeat waveform
+        // 2. Draw Heartbeat ECG waveform (x: 1.5 to 18.0, centered at y = 9.0)
         let path = NSBezierPath()
-        path.lineWidth = 1.6
+        path.lineWidth = 1.5
         path.lineCapStyle = .round
         path.lineJoinStyle = .round
 
-        // Geometry points across width (0 .. 22)
-        // Baseline around y = 9
         path.move(to: NSPoint(x: 1.5, y: 9.0))
-        path.line(to: NSPoint(x: 5.5, y: 9.0))
-        path.line(to: NSPoint(x: 7.5, y: 11.5))   // small P wave
-        path.line(to: NSPoint(x: 9.5, y: 9.0))
-        path.line(to: NSPoint(x: 11.0, y: 3.0))   // Q wave dip
-        path.line(to: NSPoint(x: 13.5, y: 16.0))  // R wave tall peak
-        path.line(to: NSPoint(x: 16.0, y: 4.5))   // S wave dip
-        path.line(to: NSPoint(x: 17.5, y: 9.0))
-        path.line(to: NSPoint(x: 20.5, y: 9.0))
+        path.line(to: NSPoint(x: 4.5, y: 9.0))
+        path.line(to: NSPoint(x: 6.5, y: 11.2))   // P wave
+        path.line(to: NSPoint(x: 8.5, y: 9.0))
+        path.line(to: NSPoint(x: 10.0, y: 4.0))   // Q wave dip
+        path.line(to: NSPoint(x: 12.2, y: 15.5))  // R wave peak
+        path.line(to: NSPoint(x: 14.5, y: 4.5))   // S wave dip
+        path.line(to: NSPoint(x: 16.0, y: 9.0))
+        path.line(to: NSPoint(x: 18.0, y: 9.0))
 
-        color.setStroke()
+        strokeColor.setStroke()
         path.stroke()
 
+        // 3. Draw Turbo Boost indicator dot
+        // Dot center at x: 24.5 (creates exact 4.3pt gap from ECG end at 18.0)
+        let dotCenter = NSPoint(x: 24.5, y: 9.0)
+        let dotRadius: CGFloat = 2.2
+        let dotRect = NSRect(
+            x: dotCenter.x - dotRadius,
+            y: dotCenter.y - dotRadius,
+            width: dotRadius * 2,
+            height: dotRadius * 2
+        )
+        let dotPath = NSBezierPath(ovalIn: dotRect)
+
+        if turboBoostEnabled {
+            // Turbo Boost ON: Solid electric cyan dot
+            NSColor(calibratedRed: 0.18, green: 0.80, blue: 0.95, alpha: 1.0).setFill()
+            dotPath.fill()
+        } else {
+            // Turbo Boost OFF: Crisp outline ring
+            NSColor.secondaryLabelColor.withAlphaComponent(0.45).setStroke()
+            dotPath.lineWidth = 1.1
+            dotPath.stroke()
+        }
+
         image.unlockFocus()
-        image.isTemplate = false // Preserve system colors in menu bar
+        image.isTemplate = false
         return image
     }
 }

@@ -18,10 +18,19 @@ Didesain khusus untuk efisiensi maksimum: **< 15 MB RAM** dan **< 0.05% CPU**.
    - **Event-driven**: Terhubung via `IOPSNotificationCreateRunLoopSource` (0% polling saat status baterai statis).
    - Opsi menampilkan angka Watt langsung di samping icon menu bar.
 
-3. **Intel Turbo Boost Toggle**:
-   - Mengatur MSR `0x1A0` (`IA32_MISC_ENABLE`) bit 38 untuk mengunci thermal & clockspeed CPU Intel.
+3. **Intel Turbo Boost Toggle & Status Indicator**:
+   - Indicator di menu bar:
+     - ⚡ (Kuning): Turbo Boost **ON** (clockspeed maksimal diizinkan).
+     - ⚡⃠ (Abu-abu): Turbo Boost **OFF** (CPU dibatasi base clock untuk menghemat suhu/baterai).
+   - Toggle instan via dropdown menu atau hotkey `Cmd+T`.
+   - Helper tool ringan (`/usr/local/bin/minicontrol-tb`) untuk kontrol MSR register tingkat hardware.
 
-4. **Zero-Power Sleep Aware**:
+4. **Real-time CPU History Graph View**:
+   - Mini sparkline graph langsung di dropdown menu (30 sample terakhir).
+   - Dynamic gradient & guideline batas 50% dan 80%.
+   - Render native via CoreGraphics dengan alokasi memori minimal.
+
+5. **Zero-Power Sleep Aware**:
    - Berhenti total saat layar/mesin sleep (`screensDidSleepNotification`), konsumsi CPU 0.00%.
 
 ## Struktur Direktori
@@ -31,6 +40,9 @@ mini-control/
 ├── Package.swift                     # Konfigurasi Swift Package Manager
 ├── Makefile                          # Script build & bundle .app otomatis
 ├── PRD.md                            # Product Requirement Document
+├── scripts/
+│   ├── tb_toggle.sh                  # Skrip kontrol MSR / kext Turbo Boost
+│   └── install_helper.sh             # Skrip instalasi root helper daemon
 ├── Resources/
 │   └── Info.plist                    # Bundle metadata (LSUIElement = true)
 └── Sources/
@@ -44,20 +56,19 @@ mini-control/
         │   ├── CPUMonitor.swift              # Mach kernel host CPU sampler
         │   └── PowerMonitor.swift            # IOKit AppleSmartBattery event monitor
         └── Views/
-            └── HeartbeatIcon.swift           # Vector ECG renderer (cached)
+            ├── HeartbeatIcon.swift           # Vector ECG renderer (cached)
+            └── CPUHistoryGraphView.swift     # Realtime sparkline graph view
 ```
 
 ## Cara Build & Menjalankan
 
-### Persyaratan:
-- macOS 13.0+ (Ventura, Sonoma, atau Sequoia)
-- Xcode Command Line Tools (`xcode-select --install`) atau Xcode
-
-### Kompilasi & Jalankan:
+### 1. Kompilasi & Jalankan Aplikasi:
 ```bash
-# Build dan bundle menjadi MiniControl.app
-make app
-
-# Jalankan aplikasi
 make run
+```
+
+### 2. Pasang Helper Turbo Boost (Akses Hardware MSR):
+Untuk mengizinkan aplikasi mengubah frekuensi hardware Intel tanpa pop-up password:
+```bash
+sudo make install-helper
 ```

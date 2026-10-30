@@ -15,13 +15,14 @@ Fitur utama:
 
 ## 3. Spesifikasi Fitur
 
-### 3.1. Menu Bar Indicator (Heartbeat)
+### 3.1. Menu Bar Indicator (Heartbeat & Turbo Dot)
 - Host: `NSStatusItem` di `NSStatusBar.system`.
-- Visual: Icon heartbeat (`waveform.path.ecg` SF Symbol atau custom vector template).
-- Threshold warna:
-  - Hijau: CPU load 0% - 49% (Normal).
-  - Kuning: CPU load 50% - 79% (Sedang).
-  - Merah: CPU load 80% - 100% (Tinggi/Stress).
+- Visual:
+  - Waveform heartbeat: Hijau (<50%), Kuning (50-79%), Merah (>=80%).
+  - Turbo Boost Dot (sebelah kanan waveform):
+    - Solid Cyan Dot = Turbo Boost **ON** (clockspeed maksimal diizinkan).
+    - Hollow/Dimmed Outline Dot = Turbo Boost **OFF** (CPU dibatasi base clock).
+  - Status diverifikasi langsung dari kernel Mach (`kextstat` loaded extension).
 - Polling timer: `DispatchSourceTimer` (coalesced), default 2.0s interval.
 
 ### 3.2. CPU Sampling Engine
@@ -49,16 +50,19 @@ Fitur utama:
 ### 3.5. Menu Dropdown
 Struktur `NSMenu`:
 1. Header Status CPU: `CPU Load: XX%` (Heartbeat indicator).
-2. Header Power/Battery:
+2. Header Real Max Clock:
+   - Turbo Boost ON: `Max Clock: X.XX GHz (Turbo Active)`
+   - Turbo Boost OFF: `Max Clock: X.XX GHz (Base Locked)`
+3. Header Power/Battery:
    - AC Connected: `Charging: XX.X W (Adapter: YY W)`
    - Discharging: `Battery: ZZ% (Discharging: -XX.X W)`
-3. Separator.
-4. Toggle Item: `[✓] Enable Turbo Boost` (toggle hardware clock limit).
-5. Separator.
-6. Submenu `Appearance`:
+4. Separator.
+5. Toggle Item: `[✓] Enable Turbo Boost` (toggle hardware clock limit).
+6. Separator.
+7. Submenu `Appearance`:
    - Show Watt in Menu Bar: `[✓/ ]` (opsi tampilkan angka Watt di samping icon heartbeat).
    - Polling Interval: `1s` | `2s` (default) | `5s`.
-7. `Quit`.
+8. `Quit`.
 
 ## 4. Arsitektur Teknis
 ```
