@@ -16,6 +16,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let turboMenuItem = NSMenuItem(title: "Turbo Boost", action: #selector(toggleTurboBoost), keyEquivalent: "t")
     private let showWattMenuItem = NSMenuItem(title: "Show Watt in Menu Bar", action: #selector(toggleShowWatt), keyEquivalent: "")
     private let launchAtLoginMenuItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+    private var lastACConnected: Bool?
 
     // User preferences
     private var showWattInMenuBar: Bool {
@@ -159,6 +160,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private func handlePowerUpdate(status: PowerStatus) {
         powerMenuItem.title = status.menuSummary
         updateStatusItemAppearance()
+
+        if let prevAC = lastACConnected, prevAC != status.isACConnected {
+            // Power source transitioned (AC plugged/unplugged) -> ensure Turbo Boost state remains enforced
+            turboController.reapplyStateOnWake()
+        }
+        lastACConnected = status.isACConnected
     }
 
     private func updateClockMenuItem() {
@@ -213,8 +220,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func toggleTurboBoost() {
         let willEnable = (turboController.currentState != .enabled)
+        turboMenuItem.isEnabled = false
         turboController.toggle(enabled: willEnable) { [weak self] result in
             DispatchQueue.main.async {
+                self?.turboMenuItem.isEnabled = true
                 switch result {
                 case .success:
                     self?.updateTurboMenuItem()

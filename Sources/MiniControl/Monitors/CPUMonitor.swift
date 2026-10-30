@@ -157,6 +157,7 @@ final class CPUMonitor {
         isRunning = false
         timer?.cancel()
         timer = nil
+        clearPrevCpuInfo()
     }
 
     func updateInterval(_ interval: TimeInterval) {

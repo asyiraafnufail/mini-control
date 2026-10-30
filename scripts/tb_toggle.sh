@@ -35,11 +35,6 @@ check_status() {
     # If DisableTurboBoost kext is loaded into kernel, Turbo Boost is OFF
     if kextstat 2>/dev/null | grep -q "$KEXT_BUNDLE_ID"; then
         echo "disabled"
-        return
-    fi
-
-    if [ -f "$STATE_FILE" ]; then
-        cat "$STATE_FILE"
     else
         echo "enabled"
     fi
@@ -52,14 +47,26 @@ set_turbo() {
         # Turbo Boost OFF = Load DisableTurboBoost.kext
         if [ "$(id -u)" -eq 0 ]; then
             if [ -n "$FOUND_KEXT" ]; then
-                kextload "$FOUND_KEXT" 2>/dev/null || true
+                # Unload first if already loaded to force MSR re-write on wake
+                if kextstat 2>/dev/null | grep -q "$KEXT_BUNDLE_ID"; then
+                    kextunload -b "$KEXT_BUNDLE_ID" 2>/dev/null || \
+                    ( [ -n "$FOUND_KEXT" ] && kextunload "$FOUND_KEXT" 2>/dev/null ) || true
+                    sleep 0.2
+                fi
+                kextload "$FOUND_KEXT" 2>/dev/null || \
+                kmutil load -p "$FOUND_KEXT" 2>/dev/null || true
             elif which voltageshift >/dev/null 2>&1; then
                 voltageshift turbo 0 >/dev/null 2>&1 || true
             fi
         fi
-        echo "disabled" > "$STATE_FILE"
+        if kextstat 2>/dev/null | grep -q "$KEXT_BUNDLE_ID"; then
+            echo "disabled" > "$STATE_FILE"
+            echo "disabled"
+        else
+            echo "enabled" > "$STATE_FILE"
+            echo "enabled"
+        fi
         chmod 666 "$STATE_FILE" 2>/dev/null || true
-        echo "disabled"
     else
         # Turbo Boost ON = Unload DisableTurboBoost.kext
         if [ "$(id -u)" -eq 0 ]; then

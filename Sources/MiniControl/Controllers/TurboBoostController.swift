@@ -18,11 +18,19 @@ final class TurboBoostController {
 
     private let helperPath = "/usr/local/bin/minicontrol-tb"
     private let stateFile = "/tmp/minicontrol_tb_state"
+    private let helperQueue = DispatchQueue(label: "com.minicontrol.helper-queue", qos: .userInitiated)
+    private var wakeWorkItem: DispatchWorkItem?
 
     init() {
         checkArchitecture()
         checkHelperInstalled()
-        refreshRealStatus()
+
+        let intendedEnabled = UserDefaults.standard.object(forKey: "turboBoostEnabled") as? Bool ?? true
+        if !intendedEnabled && isHelperInstalled {
+            toggle(enabled: false) { _ in }
+        } else {
+            refreshRealStatus()
+        }
     }
 
     private func checkArchitecture() {
@@ -90,9 +98,17 @@ final class TurboBoostController {
     func reapplyStateOnWake() {
         guard isIntel else { return }
 
+        // Debounce multiple wake notifications
+        wakeWorkItem?.cancel()
+
         let intendedEnabled = UserDefaults.standard.object(forKey: "turboBoostEnabled") as? Bool ?? true
         if !intendedEnabled {
-            toggle(enabled: false) { _ in }
+            let item = DispatchWorkItem { [weak self] in
+                self?.toggle(enabled: false) { _ in }
+            }
+            wakeWorkItem = item
+            // Delay 0.5s after wake to ensure CPU cores are fully awake before re-applying MSR
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: item)
         } else {
             refreshRealStatus()
         }
@@ -112,6 +128,9 @@ final class TurboBoostController {
         let targetState: TurboBoostState = enabled ? .enabled : .disabled
         self.currentState = targetState
 
+        // Persist user preference across sessions and wake
+        UserDefaults.standard.set(enabled, forKey: "turboBoostEnabled")
+
         // Update state file
         try? (enabled ? "enabled\n" : "disabled\n").write(
             toFile: stateFile,
@@ -120,16 +139,36 @@ final class TurboBoostController {
         )
 
         if isHelperInstalled {
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            helperQueue.async { [weak self] in
+                guard let self = self else { return }
+
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
-                process.arguments = [self?.helperPath ?? "", enabled ? "on" : "off"]
+                process.arguments = ["-n", self.helperPath, enabled ? "on" : "off"]
                 try? process.run()
                 process.waitUntilExit()
 
                 // Re-verify actual hardware state after kextload/kextunload
                 Thread.sleep(forTimeInterval: 0.3)
-                self?.refreshRealStatus()
+                self.refreshRealStatus()
+
+                // Safety retry: If intended to disable but hardware didn't switch (e.g. wake PM lag), retry once
+                if !enabled {
+                    DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                        guard let self = self else { return }
+                        if self.currentState != .disabled {
+                            self.helperQueue.async {
+                                let retryProc = Process()
+                                retryProc.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+                                retryProc.arguments = ["-n", self.helperPath, "off"]
+                                try? retryProc.run()
+                                retryProc.waitUntilExit()
+                                Thread.sleep(forTimeInterval: 0.3)
+                                self.refreshRealStatus()
+                            }
+                        }
+                    }
+                }
 
                 DispatchQueue.main.async {
                     completion(.success(enabled))
