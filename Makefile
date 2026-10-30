@@ -8,12 +8,15 @@ RESOURCES_DIR = $(CONTENTS_DIR)/Resources
 DMG_NAME = $(APP_NAME).dmg
 DMG_TMP = .dmg_tmp
 
-.PHONY: all build app run clean install-helper dmg
+.PHONY: all build app run clean install-helper dmg icon
 
 all: app
 
 SDK_PATH = $(shell xcrun --show-sdk-path 2>/dev/null)
 SWIFT_FILES = $(shell find Sources/MiniControl -name "*.swift")
+
+icon:
+	@swift scripts/generate_icon.swift
 
 build:
 	@mkdir -p $(BUILD_DIR)
@@ -35,6 +38,9 @@ app: build
 	@cp Resources/Info.plist $(CONTENTS_DIR)/Info.plist
 	@if [ -d "Resources/DisableTurboBoost.kext" ]; then \
 		cp -R Resources/DisableTurboBoost.kext $(RESOURCES_DIR)/; \
+	fi
+	@if [ -f "Resources/AppIcon.icns" ]; then \
+		cp Resources/AppIcon.icns $(RESOURCES_DIR)/; \
 	fi
 	@echo "Signing $(APP_BUNDLE) with ad-hoc signature..."
 	@codesign --force --deep --sign - $(APP_BUNDLE) 2>/dev/null || true
