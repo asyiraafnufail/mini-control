@@ -51,7 +51,62 @@ final class TurboBoostController {
     }
 
     func checkHelperInstalled() {
-        isHelperInstalled = FileManager.default.fileExists(atPath: helperPath)
+        guard FileManager.default.fileExists(atPath: helperPath) else {
+            isHelperInstalled = false
+            return
+        }
+
+        // Verify passwordless sudo actually works
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+        proc.arguments = ["-n", helperPath, "status"]
+        proc.standardOutput = Pipe()
+        proc.standardError = Pipe()
+        do {
+            try proc.run()
+            proc.waitUntilExit()
+            isHelperInstalled = (proc.terminationStatus == 0)
+        } catch {
+            isHelperInstalled = false
+        }
+    }
+
+    /// Prompts user with native macOS Touch ID / Password dialog to install the helper tool
+    func installHelperWithPrompt(completion: @escaping (Bool) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+
+            var installScriptPath: String?
+            if let bundlePath = Bundle.main.path(forResource: "install_helper", ofType: "sh") {
+                installScriptPath = bundlePath
+            } else if let resourcePath = Bundle.main.resourcePath {
+                let candidate = (resourcePath as NSString).appendingPathComponent("install_helper.sh")
+                if FileManager.default.fileExists(atPath: candidate) {
+                    installScriptPath = candidate
+                }
+            } else {
+                let devPath = "/Applications/MiniControl.app/Contents/Resources/install_helper.sh"
+                if FileManager.default.fileExists(atPath: devPath) {
+                    installScriptPath = devPath
+                }
+            }
+
+            guard let scriptPath = installScriptPath else {
+                DispatchQueue.main.async { completion(false) }
+                return
+            }
+
+            let appleScriptSource = "do shell script \"'\(scriptPath)'\" with administrator privileges"
+            var error: NSDictionary?
+            if let script = NSAppleScript(source: appleScriptSource) {
+                script.executeAndReturnError(&error)
+            }
+
+            self.checkHelperInstalled()
+            DispatchQueue.main.async {
+                completion(self.isHelperInstalled)
+            }
+        }
     }
 
     /// Queries actual hardware/kernel state
@@ -147,6 +202,19 @@ final class TurboBoostController {
                 process.arguments = ["-n", self.helperPath, enabled ? "on" : "off"]
                 try? process.run()
                 process.waitUntilExit()
+
+                if process.terminationStatus != 0 {
+                    self.refreshRealStatus()
+                    DispatchQueue.main.async {
+                        let error = NSError(
+                            domain: "MiniControl",
+                            code: 2,
+                            userInfo: [NSLocalizedDescriptionKey: "Helper tool belum memiliki izin sudoers. Jalankan di Terminal:\n\nsudo make install-helper"]
+                        )
+                        completion(.failure(error))
+                    }
+                    return
+                }
 
                 // Re-verify actual hardware state after kextload/kextunload
                 Thread.sleep(forTimeInterval: 0.3)

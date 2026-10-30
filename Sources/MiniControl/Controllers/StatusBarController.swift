@@ -219,7 +219,35 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     @objc private func toggleTurboBoost() {
+        if !turboController.isHelperInstalled {
+            let alert = NSAlert()
+            alert.messageText = "Pasang Turbo Boost Helper"
+            alert.informativeText = "MiniControl membutuhkan helper tool sekali pasang untuk mengontrol hardware CPU & kipas tanpa password.\n\nKlik Pasang untuk mengaktifkan dengan Touch ID atau Password Mac."
+            alert.addButton(withTitle: "Pasang Helper")
+            alert.addButton(withTitle: "Batal")
+            if alert.runModal() == .alertFirstButtonReturn {
+                turboMenuItem.isEnabled = false
+                turboController.installHelperWithPrompt { [weak self] success in
+                    self?.turboMenuItem.isEnabled = true
+                    if success {
+                        self?.performTurboToggle(willEnable: false)
+                    } else {
+                        let failAlert = NSAlert()
+                        failAlert.messageText = "Pemasangan Helper Dibatalkan"
+                        failAlert.informativeText = "Helper tidak terpasang. Turbo Boost tidak dapat diubah tanpa izin root."
+                        failAlert.alertStyle = .warning
+                        failAlert.runModal()
+                    }
+                }
+            }
+            return
+        }
+
         let willEnable = (turboController.currentState != .enabled)
+        performTurboToggle(willEnable: willEnable)
+    }
+
+    private func performTurboToggle(willEnable: Bool) {
         turboMenuItem.isEnabled = false
         turboController.toggle(enabled: willEnable) { [weak self] result in
             DispatchQueue.main.async {
@@ -281,21 +309,23 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     @objc private func showHelperInstallAlert() {
+        turboController.checkHelperInstalled()
         let alert = NSAlert()
         alert.messageText = "Turbo Boost Helper Setup"
         if turboController.isHelperInstalled {
-            alert.informativeText = "Helper tool is installed at /usr/local/bin/minicontrol-tb.\nHardware MSR toggling is fully enabled."
+            alert.informativeText = "Helper tool aktif di /usr/local/bin/minicontrol-tb.\nHardware MSR & kontrol Turbo Boost normal."
             alert.addButton(withTitle: "OK")
             alert.runModal()
         } else {
-            let cmd = "sudo \"/Applications/MiniControl.app/Contents/Resources/install_helper.sh\""
-            alert.informativeText = "To allow hardware MSR clock control without password prompts, run this command in Terminal:\n\n\(cmd)"
-            alert.addButton(withTitle: "Copy Command")
-            alert.addButton(withTitle: "Cancel")
-            let resp = alert.runModal()
-            if resp == .alertFirstButtonReturn {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(cmd, forType: .string)
+            alert.informativeText = "Helper tool belum terpasang. Klik Pasang untuk mengaktifkan kontrol CPU via Touch ID / Password."
+            alert.addButton(withTitle: "Pasang Helper")
+            alert.addButton(withTitle: "Batal")
+            if alert.runModal() == .alertFirstButtonReturn {
+                turboController.installHelperWithPrompt { [weak self] success in
+                    if success {
+                        self?.updateTurboMenuItem()
+                    }
+                }
             }
         }
     }
